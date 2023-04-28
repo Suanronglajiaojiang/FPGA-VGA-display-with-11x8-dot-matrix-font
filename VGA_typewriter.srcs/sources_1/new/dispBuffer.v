@@ -29,6 +29,18 @@
         end
     end
 
+
+
+    reg [6:0] ascii_disp = 7'd32;
+    reg [POS_WIDTH-1:0] x = 0;
+    reg [POS_WIDTH-1:0] y = 0;
+    always@(posedge writeEn) begin
+        ascii_disp <= ascii_disp == 127 ? 32 : ascii_disp + 1;
+        x <= x == BUFFER_X - 1 ? 0 : x + 1;
+        y <= x == BUFFER_X - 1 ? (y == BUFFER_Y - 1 ? 0 : y + 1) : y;
+        Buffer[x][y] <= {8'h15,1'b1,ascii_disp};
+    end
+
     // always@(posedge clear) begin
     //         for(i=0;i<BUFFER_X;i=i+1) begin
     //             for(j=0;j<BUFFER_Y;j=j+1) begin
