@@ -10,7 +10,7 @@ module display_480p #(
         parameter V_BP = 33,
         parameter H_POL = 0,
         parameter V_POL = 0,
-        parameter H_OFFSET = 2,
+        parameter H_OFFSET = 1,
         parameter SCALE = 8,
         parameter CHARA_WIDTH = 8,
         parameter CHARA_HEIGHT = 11,
@@ -20,7 +20,7 @@ module display_480p #(
         parameter signed  V_STA = -((V_FP + V_SYNC) + V_BP)
  )(
         input wire clk_pix,                
-        input wire rst_pix,                
+        input wire rst_n,                
         output reg hsync = 1,                 
         output reg vsync = 1,                  
         output reg de = 0,                     
@@ -45,42 +45,39 @@ module display_480p #(
         // reg signed [CORDW - 1:0] y;
 
         
-        always @(posedge clk_pix) begin
-                hsync <= (H_POL ? (sx > HS_STA) && (sx <= HS_END) : ~((sx > HS_STA) && (sx <= HS_END)));
-                vsync <= (V_POL ? (sy > VS_STA) && (sy <= VS_END) : ~((sy > VS_STA) && (sy <= VS_END)));
-                if (rst_pix) begin
+        always @(posedge clk_pix or negedge rst_n) begin
+                if (!rst_n) begin
                         hsync <= (H_POL ? 0 : 1);
                         vsync <= (V_POL ? 0 : 1);
                 end
+                else begin                
+                        hsync <= (H_POL ? (sx > HS_STA) && (sx <= HS_END) : ~((sx > HS_STA) && (sx <= HS_END)));
+                        vsync <= (V_POL ? (sy > VS_STA) && (sy <= VS_END) : ~((sy > VS_STA) && (sy <= VS_END)));
+                end
         end
-        always @(posedge clk_pix) begin
-                de <= (sy >= VA_STA && sy < CHARA_HEIGHT*SCALE*GRID_ROW) && (sx >= HA_STA && sx < CHARA_WIDTH*SCALE*GRID_COL);
-                frame <= (sy == V_STA) && (sx == H_STA);
-                line <= sx == H_STA;
-                if (rst_pix) begin
+        always @(posedge clk_pix or negedge rst_n) begin
+                if (!rst_n) begin
                         de <= 0;
                         frame <= 0;
                         line <= 0;
                 end
+                else begin                
+                        de <= (sy >= VA_STA && sy < CHARA_HEIGHT*SCALE*GRID_ROW) && (sx >= HA_STA && sx < CHARA_WIDTH*SCALE*GRID_COL);
+                        frame <= (sy == V_STA) && (sx == H_STA);
+                        line <= sx == H_STA;
+                end
         end
-        always @(posedge clk_pix) begin
-                if (sx == HA_END) begin
+        always @(posedge clk_pix or negedge rst_n) begin
+                if (!rst_n) begin
+                        sx <= H_STA;
+                        sy <= V_STA;
+                end                
+                else if (sx == HA_END) begin
                         sx <= H_STA;
                         sy <= (sy == VA_END ? V_STA : sy + 1);
                 end
                 else
                         sx <= sx + 1;
-                if (rst_pix) begin
-                        sx <= H_STA;
-                        sy <= V_STA;
-                end
         end
-        // always @(posedge clk_pix) begin
-                // sx <= x;
-                // sy <= y;
-                // if (rst_pix) begin
-                        // sx <= H_STA;
-                        // sy <= V_STA;
-                // end
-        // end
+
 endmodule

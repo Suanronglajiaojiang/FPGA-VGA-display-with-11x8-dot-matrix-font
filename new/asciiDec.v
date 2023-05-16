@@ -1,6 +1,7 @@
 module asciiDec #(
-    parameter ASCII_WIDTH = 7,
-    parameter ADDR_WIDTH = 11
+    parameter ASCII_WIDTH = 8,
+    parameter ADDR_WIDTH = 11,
+    parameter CHARA_HEIGHT = 11
     )(
     input [ASCII_WIDTH-1:0] ascii,
     input [3:0] lineCnt,

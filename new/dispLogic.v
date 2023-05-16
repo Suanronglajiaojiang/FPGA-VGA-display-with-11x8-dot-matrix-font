@@ -1,8 +1,8 @@
 module dispLogic #(
     parameter GRID_ROW = 5,
     parameter GRID_COL = 10,
-    parameter POS_WIDTH = 6,
-    parameter ASCII_WIDTH = 7,
+    parameter ASCII_WIDTH = 8,
+    parameter BUFFER_WIDTH = 16,
     parameter ADDR_WIDTH = 11,
     parameter CHARA_WIDTH = 8,  
     parameter CHARA_HEIGHT = 11,
@@ -10,13 +10,14 @@ module dispLogic #(
     parameter SCALE = 8
     )(
     input clk_pix,
-    input rst,
-    input [3:0] ctrl,
-    input [3:0] colorIndexF,
-    input [3:0] colorIndexB,
-    input [6:0] asciiWrite,
-    input writeEn,
-    input ctrlEn,
+    input rst_n,
+    // input [15:0] btn,
+    // input [2:0] shift,
+    input [(BUFFER_WIDTH-ASCII_WIDTH)/2-1:0] colorIndexF,
+    input [(BUFFER_WIDTH-ASCII_WIDTH)/2-1:0] colorIndexB,
+    input [ASCII_WIDTH-1:0] asciiWrite,
+    // input writeEn,
+    input dataReady,
     output vga_hsync,    // horizontal sync
     output vga_vsync,    // vertical sync
     output reg [11:0] vga  // 12-bit VGA color
@@ -28,9 +29,15 @@ module dispLogic #(
     wire signed [CORDW - 1:0] sx;
     wire signed [CORDW - 1:0] sy;   
     wire hsync,vsync; 
-    display_480p  display_inst(
+    display_480p #(
+        .SCALE(SCALE),
+        .CHARA_WIDTH(CHARA_WIDTH),
+        .CHARA_HEIGHT(CHARA_HEIGHT),
+        .GRID_ROW(GRID_ROW),
+        .GRID_COL(GRID_COL)
+    ) display_inst(
         clk_pix,
-        rst,
+        rst_n,
         vga_hsync,
         vga_vsync,
         dataEnable,
@@ -43,14 +50,20 @@ module dispLogic #(
     reg [$clog2(GRID_COL)-1:0] chPos_x = 0;
     reg [$clog2(GRID_ROW)-1:0] chPos_y = 0;
     wire [15:0] charBundle;    
-    dispBuffer  displayBuffer(
+    dispBuffer #(
+        BUFFER_WIDTH,
+        ASCII_WIDTH,
+        GRID_ROW,
+        GRID_COL
+    ) displayBuffer(
         clk_pix,
-        rst,
-        ctrl,
+        rst_n,
+        // btn,
+        // shift,
         chPos_x,
         chPos_y,
-        writeEn,
-        ctrlEn,
+        // writeEn,
+        dataReady,
         asciiWrite,
         colorIndexF,
         colorIndexB,
@@ -66,10 +79,10 @@ module dispLogic #(
         SCALE,
         CHARA_WIDTH,
         CHARA_HEIGHT,
-        GRID_ROW,
+        // GRID_ROW,
         CORDW
     ) charaMagnifier(
-        rst,
+        rst_n,
         dataEnable,
         sx,
         sy,
@@ -80,15 +93,22 @@ module dispLogic #(
     );    
  
     wire [ADDR_WIDTH-1:0] charaLineAddr;
-    asciiDec asciiDecLogic(
-        charBundle[6:0],
+    asciiDec #(
+        ASCII_WIDTH, 
+        ADDR_WIDTH,
+        CHARA_HEIGHT
+    ) asciiDecLogic(
+        charBundle[7:0],
         lineCnt,
         charaLineAddr
     );  
     
               
     wire [CHARA_WIDTH-1:0] charaLine;                                                               
-    charaROM charrom(
+    charaROM #(
+        CHARA_WIDTH,
+        ADDR_WIDTH 
+    ) charrom(
         charaLineAddr,
         charaLine
     );                      
@@ -108,8 +128,11 @@ module dispLogic #(
     
     // integer i;
     // integer j;
-    always@( posedge bitCnt == 0 ) begin
-        if( dataEnable ) begin
+    always@( posedge bitCnt == 0 or negedge rst_n) begin
+        if(!rst_n) begin
+            chPos_x <= 0;
+        end        
+        else if( dataEnable ) begin
             if( chPos_x == GRID_COL - 1 ) begin
                 chPos_x <= 0;
             end
@@ -117,13 +140,13 @@ module dispLogic #(
                 chPos_x <=  chPos_x + 1 ;             
             end
         end
-        if(rst) begin
-            chPos_x <= 0;
-        end        
     end
     
-    always@( posedge lineCnt == 0 ) begin
-        if( dataEnable ) begin
+    always@( posedge lineCnt == 0 or negedge rst_n) begin
+        if(!rst_n) begin
+            chPos_y <= 0;
+        end            
+        else if( dataEnable ) begin
             if( chPos_y == GRID_ROW - 1 ) begin
                 chPos_y <= 0;
             end
@@ -131,15 +154,15 @@ module dispLogic #(
                 chPos_y <=  chPos_y + 1 ;             
             end
         end
-        if(rst) begin
-            chPos_y <= 0;
-        end            
     end   
     
            
     
-    always@(posedge clk_pix) begin
-        if ( dataEnable ) begin
+    always@(posedge clk_pix or negedge rst_n) begin
+        if(!rst_n) begin
+            vga <= 12'h0;
+        end
+        else if ( dataEnable ) begin
             if ( charaLine[bitCnt] ) begin
                 vga <= charColor;
             end
